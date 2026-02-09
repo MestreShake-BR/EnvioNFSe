@@ -1,16 +1,18 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
+using System.Reflection;
+using System.Xml;
 
 namespace NFSe.Class
 {
     internal class Banco
     {
-
-
-        static string stringConection =
-            "";
+        #region CONEXÃO
+        static string stringConection = @"";
         SqlConnection cn = new SqlConnection(stringConection);
         private SqlConnection AbrirConexao()
         {
@@ -20,12 +22,15 @@ namespace NFSe.Class
             }
             catch
             {
-
                 throw new Exception("Sem conexação");
             }
 
         }
+        #endregion
 
+        #region MONTADPS.CS
+
+        #region SELECT DA CLASSE MONTADPS.CS
         public DataTable selectRPS()
         {
 
@@ -34,7 +39,7 @@ namespace NFSe.Class
                 try
                 {
                     conexao.Open();
-                    string query = "";
+                    string query = @"";
                     DataTable dados = new DataTable();
                     SqlDataAdapter adaptador = new SqlDataAdapter(query, stringConection);
                     adaptador.Fill(dados);
@@ -46,81 +51,29 @@ namespace NFSe.Class
                 }
             }
         }
+        #endregion
 
-
-        public DataTable selectRPSSP()
-        {
-
-            using (var conexao = AbrirConexao())
-            {
-                try
-                {
-                    conexao.Open();
-                    string query = "";
-                    DataTable dados = new DataTable();
-                    SqlDataAdapter adaptador = new SqlDataAdapter(query, stringConection);
-                    adaptador.Fill(dados);
-                    return dados;
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception(" " + ex);
-                }
-            }
-        }
-
-        public void updateRPS(string chaveAcesso, string sNrNFSe, string numeroRPS, string emitente)
+        #region UPDATE DA CLASSE MONTADPS.CS
+        public void updateRPS(string chaveAcesso, string sNrNFSe, string numeroRPS, string emitente, string situacao, string mensagem)
         {
             using (var conexao = AbrirConexao())
             {
                 try
                 {
                     conexao.Open();
-                    string query = "";
+                    string query = @"";
                     using (var comando = conexao.CreateCommand())
                     {
                         comando.CommandText = query;
 
                         // Parâmetros
                         comando.Parameters.AddWithValue("@ChaveAcesso", chaveAcesso);
-                        comando.Parameters.AddWithValue("@NumeroNFSE", sNrNFSe);
+                        comando.Parameters.AddWithValue("@sNrNFSe", sNrNFSe);
                         comando.Parameters.AddWithValue("@NumeroRPS", numeroRPS);
-                        comando.Parameters.AddWithValue("@emitente", emitente);
+                        comando.Parameters.AddWithValue("@iID_Emitente", emitente);
 
-                        // Executa o UPDATE
-                        int linhasAfetadas = comando.ExecuteNonQuery();
-
-                        Console.WriteLine($"{linhasAfetadas} linha(s) atualizada(s) com sucesso.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception("Erro ao atualizar RPS: " + ex.Message, ex);
-                }
-            }
-        }
-
-        public void updateRPSSP(string chaveAcesso, string NumeroNFe, string mensagem, string codigoVerificacao, string situacao, string nNumero, string IdEmitente)
-        {
-            using (var conexao = AbrirConexao())
-            {
-                try
-                {
-                    conexao.Open();
-                    string query = "";
-                    using (var comando = conexao.CreateCommand())
-                    {
-                        comando.CommandText = query;
-
-                        // Parâmetros
-                        comando.Parameters.AddWithValue("@NumeroNFe", NumeroNFe);
-                        comando.Parameters.AddWithValue("@CodigoVerificacao", codigoVerificacao);
                         comando.Parameters.AddWithValue("@Situacao", situacao);
-                        comando.Parameters.AddWithValue("@ChaveAcesso", chaveAcesso);
                         comando.Parameters.AddWithValue("@Mensagem", mensagem);
-                        comando.Parameters.AddWithValue("@nNumero", nNumero);
-                        comando.Parameters.AddWithValue("@IdEmitente", IdEmitente);
-
                         // Executa o UPDATE
                         int linhasAfetadas = comando.ExecuteNonQuery();
 
@@ -133,7 +86,9 @@ namespace NFSe.Class
                 }
             }
         }
+        #endregion
 
+        #region POPULA CLASSE MONTADPS.CS
         public DadosNfse ConvertToDados(DataRow dr)
         {
             DadosNfse dados = new DadosNfse();
@@ -152,8 +107,6 @@ namespace NFSe.Class
             dados.Prestador.Cnpj = dr["sCNPJPrestador"]?.ToString() ?? "";
             dados.Prestador.InscricaoMunicipal = dr["sIMPrestador"]?.ToString() ?? "";
             dados.Prestador.OpcaoSimplesNacional = dr["sOpSimples"]?.ToString() ?? "";
-
-            // Perguntar para o Sr Roberto - use valores temporários
             dados.Prestador.RegimeAplicacaoTributacaoSN = dr["sOpSimples"]?.ToString() ?? "0";
 
             // Tomador
@@ -189,13 +142,78 @@ namespace NFSe.Class
             dados.Servico.ValorContribuicaoSocial = dr["nVlCsll"]?.ToString() ?? "";
             dados.Servico.CSTPIS = dr["sCSTPIS"]?.ToString() ?? "";
             dados.Servico.CSTCOFINS = dr["sCSTCOFINS"]?.ToString() ?? "";
+            
             // ALQUOTA PIS COFINS
             dados.Servico.ALIQ_PIS = dr["ALIQ_PIS"]?.ToString() ?? "";
             dados.Servico.ALIQ_COFINS = dr["ALIQ_COFINS"]?.ToString() ?? "";
             dados.Servico.ALIQ_ISS = dr["ALIQ_ISS"]?.ToString() ?? "";
             return dados;
         }
+        #endregion
 
+        #endregion
+
+        #region MONTARPDSSP.CS
+
+        #region SELECT DA CLASSE MONTARPDSSP.CS
+        public DataTable selectRPSSP()
+        {
+            using (var conexao = AbrirConexao())
+            {
+                try
+                {
+                    conexao.Open();
+                    string query = @"";
+                    DataTable dados = new DataTable();
+                    SqlDataAdapter adaptador = new SqlDataAdapter(query, stringConection);
+                    adaptador.Fill(dados);
+                    return dados;
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(" " + ex);
+                }
+            }
+        }
+        #endregion
+
+        #region UPDATE DA CLASSE MONTARPDSSP.CS
+        public void updateRPSSP(string chaveAcesso, string NumeroNFe, string mensagem, string codigoVerificacao, string situacao, string nNumero, string IdEmitente)
+        {
+            using (var conexao = AbrirConexao())
+            {
+                try
+                {
+                    conexao.Open();
+                    string query = @"";
+                    using (var comando = conexao.CreateCommand())
+                    {
+                        comando.CommandText = query;
+
+                        // Parâmetros
+                        comando.Parameters.AddWithValue("@NumeroNFe", NumeroNFe);
+                        comando.Parameters.AddWithValue("@CodigoVerificacao", codigoVerificacao);
+                        comando.Parameters.AddWithValue("@Situacao", situacao);
+                        comando.Parameters.AddWithValue("@ChaveAcesso", chaveAcesso);
+                        comando.Parameters.AddWithValue("@Mensagem", mensagem);
+                        comando.Parameters.AddWithValue("@nNumero", nNumero);
+                        comando.Parameters.AddWithValue("@IdEmitente", IdEmitente);
+
+                        // Executa o UPDATE
+                        int linhasAfetadas = comando.ExecuteNonQuery();
+
+                        Console.WriteLine($"{linhasAfetadas} linha(s) atualizada(s) com sucesso.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception("Erro ao atualizar RPS: " + ex.Message, ex);
+                }
+            }
+        }
+        #endregion
+
+        #region POPULA CLASSE MONTARPDSSP.CS
         public RpsData ConvertToDadosSP(DataRow dr)
         {
             RpsData dados = new RpsData();
@@ -249,5 +267,215 @@ namespace NFSe.Class
 
             return dados;
         }
+        #endregion
+
+        #endregion
+
+        #region MONTANFESEFAZ.CS
+
+        #region SELECT DA CLASSE MONTANFESEFAZ.CS
+        public DataTable selectNFESefaz()
+        {
+            using (var conexao = AbrirConexao())
+            {
+                try
+                {
+                    conexao.Open();
+                    string query = @"";
+
+                    DataTable dados = new DataTable();
+                    SqlDataAdapter adaptador = new SqlDataAdapter(query, stringConection);
+                    adaptador.Fill(dados);
+                    return dados;
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(" " + ex);
+                }
+            }
+        }
+
+        public DataTable selectProduto(int idNota)
+        {
+            using (var conexao = AbrirConexao())
+            {
+                try
+                {
+                    conexao.Open();
+
+                    string query = @"";
+
+                    using (var cmd = new SqlCommand(query, conexao))
+                    {
+                        // Adiciona o parâmetro idNota
+                        cmd.Parameters.Add("@idNota", SqlDbType.Int).Value = idNota;
+
+                        // Usa o comando parametrizado no DataAdapter
+                        using (var adaptador = new SqlDataAdapter(cmd))
+                        {
+                            var dados = new DataTable();
+                            adaptador.Fill(dados);
+                            return dados;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Evite encadear Exception genérico. Você pode logar o ex e relançar.
+                    throw new Exception("Erro ao consultar produtos da nota.", ex);
+                }
+            }
+        }
+        #endregion                    
+
+        #region UPDATE DA CLASSE MONTANFESefaz.CS
+        public void updateNFESefaz(int idNota, string xmlRetorno, string chave)
+        {
+            try
+            {
+                XmlDocument doc = new XmlDocument();
+                doc.LoadXml(xmlRetorno);
+                XmlNode infProt = doc.GetElementsByTagName("infProt").Item(0);
+
+                string cStatStr = "", xMotivo = "", nProt = "", dhAutOriginal = "", dataFormatada = "";
+
+                if (infProt != null)
+                {
+                    cStatStr = infProt["cStat"]?.InnerText ?? "";
+                    xMotivo = infProt["xMotivo"]?.InnerText ?? "";
+                    nProt = infProt["nProt"]?.InnerText ?? "";
+                    dhAutOriginal = infProt["dhRecbto"]?.InnerText ?? "";
+                    if (DateTime.TryParse(dhAutOriginal, null, DateTimeStyles.RoundtripKind, out DateTime dtOut))
+                        dataFormatada = dtOut.ToString("yyyy-MM-dd HH:mm:ss");
+                }
+                else
+                {
+                    XmlNode retEnvi = doc.GetElementsByTagName("retEnviNFe").Item(0);
+                    cStatStr = retEnvi?["cStat"]?.InnerText ?? "999";
+                    xMotivo = retEnvi?["xMotivo"]?.InnerText ?? "Erro Sefaz";
+                }
+
+                int status = int.TryParse(cStatStr, out int s) ? s : 999;
+                int situacaoFinal = (status == 100 || status == 150) ? 4 : (status == 110 || status == 301 || status == 302) ? 6 : (status == 225) ? 3 : 5;
+
+                using (var conexao = AbrirConexao())
+                {
+                    conexao.Open();
+                    string query = @"";
+                    using (var comando = conexao.CreateCommand())
+                    {
+                        comando.CommandText = query;
+                        comando.Parameters.AddWithValue("@sit", situacaoFinal);
+                        comando.Parameters.AddWithValue("@msg", (cStatStr + " - " + xMotivo));
+                        comando.Parameters.AddWithValue("@cha", chave ?? (object)DBNull.Value);
+                        comando.Parameters.AddWithValue("@pro", nProt ?? (object)DBNull.Value);
+                        comando.Parameters.AddWithValue("@dat", !string.IsNullOrEmpty(dataFormatada) ? dataFormatada : (object)DBNull.Value);
+                        comando.Parameters.AddWithValue("@id", idNota);
+                        comando.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex) { Console.WriteLine("Erro Banco Update: " + ex.Message); }
+        }
+        #endregion
+
+        #region POPULA CLASSE MONTANFESefaz.CS
+        public PedidoNfe ConvertToDadosSEFAZ(DataRow dr)
+        {
+            PedidoNfe dados = new PedidoNfe();
+
+            if (dados.Emitente == null) dados.Emitente = new Emitente();
+            if (dados.Destinatario == null) dados.Destinatario = new Destinatario();
+            if (dados.Produtos == null) dados.Produtos = new List<Produto>();
+
+            dados.iIdNotaFisc = dr["iIdNotaFisc"] == DBNull.Value ? 0 : Convert.ToInt32(dr["iIdNotaFisc"]);
+            dados.Serie = dr["Serie"] == DBNull.Value ? 0 : Convert.ToInt32(dr["Serie"]);
+            dados.InNF = dr["inNF"] == DBNull.Value ? 0m : Convert.ToDecimal(dr["inNF"]);
+            dados.DataEmissao = dr["DataEmissao"] == DBNull.Value ? DateTime.Now : Convert.ToDateTime(dr["DataEmissao"]);
+            dados.NatOp = dr["NatOp"] == DBNull.Value ? string.Empty : dr["NatOp"]?.ToString() ?? string.Empty;
+            dados.Modelo = dr["Modelo"] == DBNull.Value ? string.Empty : dr["Modelo"]?.ToString() ?? string.Empty;
+
+            dados.Emitente.CNPJ = dr["EMIT_CNPJ"] == DBNull.Value ? string.Empty : dr["EMIT_CNPJ"]?.ToString() ?? string.Empty;
+            dados.Emitente.RazaoSocial = dr["EMIT_NOME"] == DBNull.Value ? string.Empty : dr["EMIT_NOME"]?.ToString() ?? string.Empty;
+            dados.Emitente.IE = dr["EMIT_IE"] == DBNull.Value ? string.Empty : dr["EMIT_IE"]?.ToString() ?? string.Empty;
+            dados.Emitente.Logradouro = dr["EMIT_ENDERECO"] == DBNull.Value ? string.Empty : dr["EMIT_ENDERECO"]?.ToString() ?? string.Empty;
+            dados.Emitente.Numero = dr["EMIT_NUMERO"] == DBNull.Value ? string.Empty : dr["EMIT_NUMERO"]?.ToString() ?? string.Empty;
+            dados.Emitente.Bairro = dr["EMIT_BAIRRO"] == DBNull.Value ? string.Empty : dr["EMIT_BAIRRO"]?.ToString() ?? string.Empty;
+            dados.Emitente.CodigoMunicipio = dr["EMIT_COD_MUNICIPIO"] == DBNull.Value ? string.Empty : dr["EMIT_COD_MUNICIPIO"]?.ToString() ?? string.Empty;
+            dados.Emitente.Municipio = dr["EMIT_MUNICIPIO"] == DBNull.Value ? string.Empty : dr["EMIT_MUNICIPIO"]?.ToString() ?? string.Empty;
+            dados.Emitente.UF = dr["EMIT_UF"] == DBNull.Value ? string.Empty : dr["EMIT_UF"]?.ToString() ?? string.Empty;
+            dados.Emitente.CEP = dr["EMIT_CEP"] == DBNull.Value ? string.Empty : dr["EMIT_CEP"]?.ToString() ?? string.Empty;
+            dados.Emitente.Telefone = dr["EMIT_TELEFONE"] == DBNull.Value ? string.Empty : dr["EMIT_TELEFONE"]?.ToString() ?? string.Empty;
+            dados.Emitente.CRT = dr["EMIT_CRT"] == DBNull.Value ? string.Empty : dr["EMIT_CRT"]?.ToString() ?? string.Empty;
+
+            // --- Destinatario ---
+            dados.Destinatario.CPF = dr["CPFDestinario"] == DBNull.Value ? string.Empty : dr["CPFDestinario"]?.ToString() ?? string.Empty;
+            dados.Destinatario.Nome = dr["NomeDestinario"] == DBNull.Value ? string.Empty : dr["NomeDestinario"]?.ToString() ?? string.Empty;
+            dados.Destinatario.Logradouro = dr["EnderecoDestinario"] == DBNull.Value ? string.Empty : dr["EnderecoDestinario"]?.ToString() ?? string.Empty;
+            dados.Destinatario.Numero = dr["NumeroDestinario"] == DBNull.Value ? string.Empty : dr["NumeroDestinario"]?.ToString() ?? string.Empty;
+            dados.Destinatario.Bairro = dr["BairroDestinario"] == DBNull.Value ? string.Empty : dr["BairroDestinario"]?.ToString() ?? string.Empty;
+            dados.Destinatario.Municipio = dr["MunicipioDestinario"] == DBNull.Value ? string.Empty : dr["MunicipioDestinario"]?.ToString() ?? string.Empty;
+            dados.Destinatario.CodigoMunicipio = dr["cMunDest"] == DBNull.Value ? string.Empty : dr["cMunDest"]?.ToString() ?? string.Empty;
+            dados.Destinatario.UF = dr["UFDestinario"] == DBNull.Value ? string.Empty : dr["UFDestinario"]?.ToString() ?? string.Empty;
+            dados.Destinatario.CEP = dr["CEPDestinario"] == DBNull.Value ? string.Empty : dr["CEPDestinario"]?.ToString() ?? string.Empty;
+            dados.Destinatario.IE = dr["IE"] == DBNull.Value ? string.Empty : dr["IE"]?.ToString() ?? string.Empty;
+            dados.ValorFrete = dr["ValorFrete"] == DBNull.Value ? 0m : Convert.ToDecimal(dr["ValorFrete"]);
+            dados.ValorSeguro = dr["ValorSeguro"] == DBNull.Value ? 0m : Convert.ToDecimal(dr["ValorSeguro"]);
+            dados.ValorDesconto = dr["ValorDesconto"] == DBNull.Value ? 0m : Convert.ToDecimal(dr["ValorDesconto"]);
+            dados.DiretorioBase = dr["DIR_BASE"] == DBNull.Value ? string.Empty : dr["DIR_BASE"]?.ToString() ?? string.Empty;
+
+            return dados;
+        }
+
+        public List<Produto> MapearProdutos(DataTable tabela)
+        {
+            var produtos = new List<Produto>();
+
+            foreach (DataRow r in tabela.Rows)
+            {
+
+
+                var p = new Produto
+                {
+                    Codigo = SafeGetString(r, "Codigo"),
+                    Descricao = SafeGetString(r, "Descricao"),
+                    NCM = SafeGetString(r, "NCM"),
+                    Unidade = SafeGetString(r, "Unidade"),
+                    Quantidade = SafeGetDecimal(r, "Quantidade"),
+                    ValorUnitario = SafeGetDecimal(r, "ValorUnitario"),
+                    ValorProd = SafeGetDecimal(r, "ValorProd"),
+                    CFOP = SafeGetInt(r, "CFOP")
+                };
+
+                produtos.Add(p);
+            }
+
+            return produtos;
+        }
+
+        private static int SafeGetInt(DataRow r, string col)
+        {
+            return r.Table.Columns.Contains(col) && r[col] != DBNull.Value
+                ? Convert.ToInt32(r[col])
+                : 0;
+        }
+
+        private static decimal SafeGetDecimal(DataRow r, string col)
+        {
+            return r.Table.Columns.Contains(col) && r[col] != DBNull.Value
+                ? Convert.ToDecimal(r[col])
+                : 0m;
+        }
+
+        private static string SafeGetString(DataRow r, string col)
+        {
+            return r.Table.Columns.Contains(col) && r[col] != DBNull.Value
+                ? r[col].ToString()
+                : string.Empty;
+        }
+        #endregion
+
+        #endregion
+
     }
 }
