@@ -39,7 +39,7 @@ namespace NFSe
             ServiceBase.Run(ServicesToRun);
 
 #else
-            //MontaDPS.Envio().GetAwaiter().GetResult();
+            MontaDPS.Envio().GetAwaiter().GetResult();
             MontaRPSSP.EnvioSP().GetAwaiter().GetResult();
 #endif
         }

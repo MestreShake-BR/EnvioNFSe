@@ -34,6 +34,7 @@ namespace NFSe
                 GravarLog("Iniciando execução da tarefa");
                 await MontaDPS.Envio();
                 await MontaRPSSP.EnvioSP();
+                await MONTANFESefaz.Envio();
                 GravarLog("Execução finalizada com sucesso");
             }
             catch (Exception ex)
