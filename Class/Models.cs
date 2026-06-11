@@ -1,15 +1,16 @@
 ﻿using RestSharp.Serializers.Json;
-using System.Text.Json;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography.Xml;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Serialization;
-using System.Security.Cryptography.Xml;
 
 
 namespace NFSe.Class
@@ -46,7 +47,8 @@ namespace NFSe.Class
         public ContatoNfse Contato { get; set; }
     }
 
-    public class EnderecoNfse {
+    public class EnderecoNfse
+    {
         public string Endereco { get; set; }
         public string Numero { get; set; }
         public string Complemento { get; set; }
@@ -95,14 +97,23 @@ namespace NFSe.Class
 
     public class RetornoNfse
     {
-        internal string nNFSe;
+        internal string nNFSe { get; set; }
         public int tipoAmbiente { get; set; }
         public string versaoAplicativo { get; set; }
         public DateTime dataHoraProcessamento { get; set; }
         public string idDps { get; set; }
         public string chaveAcesso { get; set; }
         public string nfseXmlGZipB64 { get; set; }
+        public string Mensagem { get; set; } = "";
         public object alertas { get; set; }
+        public List<ErroNfse> erros { get; set; }
+        public bool sucesso { get; set; }
+    }
+
+    public class ErroNfse
+    {
+        public string Codigo { get; set; }
+        public string Descricao { get; set; }
     }
     #endregion
 
@@ -157,4 +168,63 @@ namespace NFSe.Class
         public string cClassTrib { get; set; }
     }
     #endregion
+
+    #region Models para SEFAZ SP
+    public class PedidoNfe
+    {
+        public int iIdNotaFisc { get; set; }
+        public int Serie { get; set; }
+        public decimal InNF { get; set; }
+        public DateTime DataEmissao { get; set; }
+        public string NatOp { get; set; }
+        public string Modelo { get; set; }
+        public Emitente Emitente { get; set; }
+        public Destinatario Destinatario { get; set; }
+        public List<Produto> Produtos { get; set; }
+        public decimal ValorFrete { get; set; }
+        public decimal ValorSeguro { get; set; }
+        public decimal ValorDesconto { get; set; }
+        public string DiretorioBase { get; set; }
+    }
+    public class Emitente
+    {
+        public string CNPJ { get; set; }
+        public string RazaoSocial { get; set; }
+        public string IE { get; set; }
+        public string Logradouro { get; set; }
+        public string Numero { get; set; }
+        public string Bairro { get; set; }
+        public string CodigoMunicipio { get; set; }
+        public string Municipio { get; set; }
+        public string UF { get; set; }
+        public string CEP { get; set; }
+        public string Telefone { get; set; }
+        public string CRT { get; set; }
+    }
+    public class Destinatario
+    {
+        public string CPF { get; set; }
+        public string Nome { get; set; }
+        public string Logradouro { get; set; }
+        public string Numero { get; set; }
+        public string Bairro { get; set; }
+        public string Municipio { get; set; }
+        public string CodigoMunicipio { get; set; }
+        public string UF { get; set; }
+        public string CEP { get; set; }
+        public string IE { get; set; }
+    }
+    public class Produto
+    {
+        public int Item { get; set; }
+        public string Codigo { get; set; }
+        public string Descricao { get; set; }
+        public string NCM { get; set; }
+        public string Unidade { get; set; }
+        public decimal Quantidade { get; set; }
+        public decimal ValorUnitario { get; set; }
+        public decimal ValorProd { get; set; }
+        public int CFOP { get; set; }
+    }
 }
+    #endregion

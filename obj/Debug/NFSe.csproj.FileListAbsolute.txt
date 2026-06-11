@@ -26,4 +26,3 @@ C:\Users\aalves\source\repos\Envio NFSe\NFSe\obj\Debug\NFSe.csproj.CoreCompileIn
 C:\Users\aalves\source\repos\Envio NFSe\NFSe\obj\Debug\NFSe.csproj.Up2Date
 C:\Users\aalves\source\repos\Envio NFSe\NFSe\obj\Debug\NFSe.exe
 C:\Users\aalves\source\repos\Envio NFSe\NFSe\obj\Debug\NFSe.pdb
-C:\Users\aalves\source\repos\Envio NFSe\NFSe\obj\Debug\NFSe.exe.config

@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Configuration;
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -22,7 +24,7 @@ namespace NFSe.Class
     {
         const string URL_PADRAO = "https://nfews.prefeitura.sp.gov.br/lotenfe.asmx";
         const string NAMESPACE_SP = "http://www.prefeitura.sp.gov.br/nfe";
-        const string PASTA_LOGS_BASE = @"C:\NOTAS_FISCAIS\NFSE\LogsXML";
+        const string PASTA_LOGS_BASE = @"\\10.0.0.11\a$\SGM_files\NOTAS_FISCAIS\NFSE\XML";
 
         public class RPDSSPService
         {
@@ -36,7 +38,7 @@ namespace NFSe.Class
                 public StringWriterWithEncoding(Encoding encoding) => _encoding = encoding;
                 public override Encoding Encoding => _encoding;
             }
-
+                        
             private readonly X509Certificate2 _certificado;
             private readonly bool _ambiente;
 
@@ -87,9 +89,9 @@ namespace NFSe.Class
                     string pastaEmitente = (dados.sCNPJPrestador == "02011984000131") ? "Monitor_Editorial" : "Monitor";
                     string baseDir = Path.Combine(PASTA_LOGS_BASE, pastaEmitente);
 
-
+                    // XML ENVIADO
                     SalvarLog(baseDir, "Envio", $"Envio_RPS_{dados.nNumero}", xml);
-
+                    // RETORNO XML API
                     SalvarLog(baseDir, "Retorno", $"Retorno_RPS_{dados.nNumero}", resposta);
 
                     if (!string.IsNullOrWhiteSpace(resposta))
@@ -122,13 +124,14 @@ namespace NFSe.Class
                         }
                     }
 
+                    // Retorna o XML de resposta da prefeitura
                     return resposta;
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"\nErro: {ex.Message}");
                     Console.WriteLine($"Stack: {ex.StackTrace}");
-                    throw;
+                    throw; // rethrow para tratamento externo se necessário
                 }
             }
 
@@ -137,6 +140,7 @@ namespace NFSe.Class
             {
                 var assinaturaRps = GerarAssinaturaRps(cert, dados);
                 string tagTomador = dados.sCNPJCPFTomador.Length > 11 ? "CNPJ" : "CPF";
+                string deducoes = dados.nVlDeducoes.ToString("0.00", CultureInfo.InvariantCulture);
 
                 string xmlRaw = $@"<PedidoEnvioLoteRPS xmlns=""{NAMESPACE_SP}"">
 <Cabecalho Versao=""2"" xmlns="""">
@@ -157,7 +161,7 @@ namespace NFSe.Class
     <DataEmissao>{DateTime.Now:yyyy-MM-dd}</DataEmissao>
     <StatusRPS>N</StatusRPS>
     <TributacaoRPS>{dados.sTributacaoRPS}</TributacaoRPS>
-    <ValorDeducoes>{dados.nVlDeducoes}</ValorDeducoes>
+    <ValorDeducoes>{deducoes}</ValorDeducoes>
     <ValorPIS>{dados.nVlPis}</ValorPIS>
     <ValorCOFINS>{dados.nVlCofins}</ValorCOFINS>
     <ValorINSS>0.00</ValorINSS>
@@ -177,11 +181,11 @@ namespace NFSe.Class
         <CEP>{dados.sCEPTomador}</CEP>
     </EnderecoTomador>
     <Discriminacao>{dados.sDiscriminacao}</Discriminacao>
-    <ValorInicialCobrado>{dados.ValorInicialCobrado}</ValorInicialCobrado>
+    <ValorFinalCobrado>{dados.ValorInicialCobrado}</ValorFinalCobrado>
     <ValorIPI>0.00</ValorIPI>
     <ExigibilidadeSuspensa>0</ExigibilidadeSuspensa>
     <PagamentoParceladoAntecipado>0</PagamentoParceladoAntecipado>
-    <NBS>000000000</NBS>
+    <NBS>122051900</NBS>
     <cLocPrestacao>3550308</cLocPrestacao>
     <IBSCBS>
         <finNFSe>{dados.finNFSe}</finNFSe>
@@ -199,8 +203,10 @@ namespace NFSe.Class
 </RPS>
 </PedidoEnvioLoteRPS>";
 
-                XmlDocument doc = new XmlDocument();
-                doc.PreserveWhitespace = false;
+                XmlDocument doc = new XmlDocument
+                {
+                    PreserveWhitespace = false
+                };
                 doc.LoadXml(xmlRaw);
 
                 return AssinarXml(doc, cert);
@@ -253,8 +259,10 @@ namespace NFSe.Class
                     </{tagMetodo}>
                   </soap:Body>
                 </soap:Envelope>";
-                var request = new HttpRequestMessage(HttpMethod.Post, url);
-                request.Content = new StringContent(soap, Encoding.UTF8, "text/xml");
+                var request = new HttpRequestMessage(HttpMethod.Post, url)
+                {
+                    Content = new StringContent(soap, Encoding.UTF8, "text/xml")
+                };
                 request.Headers.TryAddWithoutValidation("SOAPAction", $"{NAMESPACE_SP}/ws/{actionName}");
                 var response = await client.SendAsync(request);
                 return await response.Content.ReadAsStringAsync();
@@ -342,28 +350,29 @@ namespace NFSe.Class
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"\n=== ERRO ===");
                 Console.WriteLine($"Mensagem: {ex.Message}");
             }
         }
 
         static X509Certificate2 CarregarCertificado(string emitente)
         {
-            string CERT_PATH = "";
-            string CERT_PASSWORD = "";
+            // Emitente 2 usa chave específica "Emitente2SP" para diferenciar do emitente 2 do SEFAZ
+            string chaveConfig = emitente == "2" ? "Emitente2SP" : $"Emitente{emitente}";
+            string certPathKey = $"Cert.{chaveConfig}.Path";
+            string certPasswordKey = $"Cert.{chaveConfig}.Password";
 
-            if (emitente == "")
-            {
-                CERT_PATH = "";
-                CERT_PASSWORD = "";
-            }
+            string certPath = ConfigurationManager.AppSettings[certPathKey];
+            string certPassword = ConfigurationManager.AppSettings[certPasswordKey];
+
+            if (string.IsNullOrWhiteSpace(certPath))
+                throw new InvalidOperationException($"Chave '{certPathKey}' não encontrada ou vazia no App.config.");
+
             try
             {
-                var certificado = new X509Certificate2(CERT_PATH, CERT_PASSWORD, X509KeyStorageFlags.Exportable);
-                if (!certificado.HasPrivateKey) {
+                var certificado = new X509Certificate2(certPath, certPassword, X509KeyStorageFlags.Exportable);
+                if (!certificado.HasPrivateKey)
                     throw new Exception("Certificado não possui chave privada");
-                    
-                }
-                    
 
                 Console.WriteLine($"Certificado válido: {certificado.Subject}");
                 Console.WriteLine($"Válido de: {certificado.NotBefore} até: {certificado.NotAfter}");
@@ -371,7 +380,7 @@ namespace NFSe.Class
             }
             catch (Exception ex)
             {
-                throw new Exception($"Erro ao carregar certificado: {ex.Message}");
+                throw new Exception($"Erro ao carregar certificado do emitente {emitente} (SP): {ex.Message}");
             }
         }
         public void GravarLog(string mensagem)

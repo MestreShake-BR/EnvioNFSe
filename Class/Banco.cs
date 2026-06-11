@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
@@ -12,7 +13,8 @@ namespace NFSe.Class
     internal class Banco
     {
         #region CONEXÃO
-        static string stringConection = @"";
+        static readonly string stringConection = ConfigurationManager.ConnectionStrings["SGM_GERAL"]?.ConnectionString
+            ?? throw new InvalidOperationException("String de conexão 'SGM_GERAL' não encontrada no App.config.");
         SqlConnection cn = new SqlConnection(stringConection);
         private SqlConnection AbrirConexao()
         {
@@ -39,7 +41,51 @@ namespace NFSe.Class
                 try
                 {
                     conexao.Open();
-                    string query = @"";
+                    string query = @"SELECT TOP 10 
+	iID_Emitente,
+    RTRIM(nNumero) as nNumero,
+    RTRIM(sSerie) as sSerie,
+    RTRIM(sCdMunicipio) as sCdMunicipio,
+    RTRIM(sCNPJPrestador) as sCNPJPrestador,
+    RTRIM(sIMPrestador) as sIMPrestador,
+    RTRIM(sOpSimples) as sOpSimples,
+    RTRIM(sTributacaoRPS) as sTributacaoRPS,
+    RTRIM(iIndCPFCNPJToma) as iIndCPFCNPJToma,
+    RTRIM(sCNPJCPFTomador) as sCNPJCPFTomador,
+    RTRIM(sRazSociTomador) as sRazSociTomador,
+    RTRIM(sEndTomador) as sEndTomador,
+    RTRIM(sNumeroToma) as sNumeroToma,
+    RTRIM(sCompToma) as sCompToma,
+    RTRIM(sBairroToma) as sBairroToma,
+    RTRIM(sCdMunicToma) as sCdMunicToma,
+    RTRIM(sUFToma) as sUFToma,
+    replace(RTRIM(sCEPTomador),'-','') as sCEPTomador,
+    RTRIM(sEmailTomador) as sEmailTomador,
+    replace(RTRIM(sItemListaServi),'.','') as sItemListaServi,
+    sDiscriminacao,
+    nVlServicos,
+    nVlLiqNFSe,
+    nAliquota,
+    nBaseCalculo,
+    iISSRetido,
+	nVlISS,
+    nVlPis,
+    nVlCofins,
+    nVlDeducoes,
+    nBase_Calculo_Retencoes,
+    nPerc_IR,
+    nVlIR,
+    nPerc_CSLL,
+    nVlCsll,
+	sCSTPIS,
+	sCSTCOFINS,
+    T.ALIQ_PIS
+    ,T.ALIQ_COFINS
+    ,T.ALIQ_ISS
+FROM [SGM_GERAL].[dbo].rps RPS
+INNER JOIN [SGM_GERAL].[dbo].TABELA_SERVICOS T ON T.COD_SERVICO = RPS.sItemListaServi AND T.ID_ESCOLA = RPS.iID_Emitente
+WHERE iID_Emitente in (3,10) AND iSituacao in (0,1,3)
+ORDER BY RPS.recnum DESC";
                     DataTable dados = new DataTable();
                     SqlDataAdapter adaptador = new SqlDataAdapter(query, stringConection);
                     adaptador.Fill(dados);
@@ -61,7 +107,14 @@ namespace NFSe.Class
                 try
                 {
                     conexao.Open();
-                    string query = @"";
+                    string query = @"
+                    UPDATE RPS
+                       SET iSituacao = @Situacao,                           
+                           CHAVE_ACESSO_NFSE = @ChaveAcesso,
+                           sUltimaOperacao = @Mensagem,
+                           sNrNFSe = @sNrNFSe
+                     WHERE NNUMERO = @NumeroRPS
+                       AND iID_Emitente = @iID_Emitente";
                     using (var comando = conexao.CreateCommand())
                     {
                         comando.CommandText = query;
@@ -142,7 +195,6 @@ namespace NFSe.Class
             dados.Servico.ValorContribuicaoSocial = dr["nVlCsll"]?.ToString() ?? "";
             dados.Servico.CSTPIS = dr["sCSTPIS"]?.ToString() ?? "";
             dados.Servico.CSTCOFINS = dr["sCSTCOFINS"]?.ToString() ?? "";
-            
             // ALQUOTA PIS COFINS
             dados.Servico.ALIQ_PIS = dr["ALIQ_PIS"]?.ToString() ?? "";
             dados.Servico.ALIQ_COFINS = dr["ALIQ_COFINS"]?.ToString() ?? "";
@@ -163,7 +215,51 @@ namespace NFSe.Class
                 try
                 {
                     conexao.Open();
-                    string query = @"";
+                    string query = @"SELECT 
+	 iID_Emitente,
+                        RTRIM(nNumero)                AS nNumero,
+                        RTRIM(sSerie)                 AS sSerie,
+                        RTRIM(sCdMunicipio)           AS sCdMunicipio,
+                        RTRIM(sCNPJPrestador)         AS sCNPJPrestador,
+                        RTRIM(sIMPrestador)           AS sIMPrestador,
+                        RTRIM(sOpSimples)             AS sOpSimples,
+                        RTRIM(sTributacaoRPS)         AS sTributacaoRPS,
+                        RTRIM(iIndCPFCNPJToma)        AS iIndCPFCNPJToma,
+                        RTRIM(sCNPJCPFTomador)        AS sCNPJCPFTomador,
+                        RTRIM(REPLACE(sRazSociTomador, '&', '&amp;'))        AS sRazSociTomador,
+                        left(RTRIM(sEndTomador),45)            AS sEndTomador,
+                        RTRIM(sNumeroToma)            AS sNumeroToma,
+                        RTRIM(sCompToma)              AS sCompToma,
+                        left(RTRIM(sBairroToma),30)            AS sBairroToma,
+                        RTRIM(sCdMunicToma)           AS sCdMunicToma,
+                        RTRIM(sUFToma)                AS sUFToma,
+                        replace(RTRIM(sCEPTomador),'-','') as sCEPTomador,
+                        RTRIM(sEmailTomador)          AS sEmailTomador,
+                        REPLACE(RTRIM(sItemListaServi), '.', '') AS sItemListaServi,
+                        REPLACE(REPLACE(REPLACE(CAST(sDiscriminacao as varchar(8000)), '&', '&amp;'), '<', '&lt;'), '>', '&gt;') AS sDiscriminacao,
+                        nVlServicos,
+                        (nVlLiqNFSe) AS ValorInicialCobrado,
+                        CAST(nAliquota AS DECIMAL(10,4)) / 100 AS nAliquota,
+                        nBaseCalculo,
+                        CASE 
+                            WHEN iISSRetido = 2 THEN 0 
+                            ELSE iISSRetido 
+                        END                           AS iISSRetido,
+                        nVlISS,
+                        nVlPis,
+                        nVlCofins,
+                        nVlDeducoes,
+                        RPS.nVlIR,
+                        RPS.nVlCsll,
+                        '1'                           AS indFinal,
+                        '100301'                      AS cIndOp,
+                        '0'                           AS finNFSe,
+                        '0'                           AS indDest,
+                        '000001'                      AS cClassTrib
+FROM [SGM_GERAL].[dbo].rps 
+WHERE iID_Emitente in (1,2) AND iSituacao in (0,1,3)
+ORDER BY iID_Emitente, iSituacao asc
+";
                     DataTable dados = new DataTable();
                     SqlDataAdapter adaptador = new SqlDataAdapter(query, stringConection);
                     adaptador.Fill(dados);
@@ -185,7 +281,15 @@ namespace NFSe.Class
                 try
                 {
                     conexao.Open();
-                    string query = @"";
+                    string query = @"UPDATE RPS SET
+    sNrNFSe = @NumeroNFe, 
+    sCdVerificao = @CodigoVerificacao, 
+    iSituacao = @Situacao,
+    CHAVE_ACESSO_NFSE = @ChaveAcesso, 
+    sUltimaOperacao = @Mensagem,
+    DATA_RETORNO_PREFEITURA = GETDATE()
+WHERE iID_Emitente = @IdEmitente 
+  AND nNumero = @nNumero";
                     using (var comando = conexao.CreateCommand())
                     {
                         comando.CommandText = query;
@@ -281,7 +385,42 @@ namespace NFSe.Class
                 try
                 {
                     conexao.Open();
-                    string query = @"";
+                    string query = @"
+SELECT iIdNotaFisc,
+    N.iSerie AS Serie,
+    ISNULL(NULLIF(N.inNF, 0), N.iIdNotaFisc) AS inNF,
+    N.dEmi AS DataEmissao,
+    RTRIM(ISNULL(N.snatOp, 'VENDA')) AS NatOp,
+    N.sMod AS Modelo,
+    dbo.fn_LimpaCNPJ_CPF(E.INS_CNPJ) AS EMIT_CNPJ,
+    RTRIM(E.INS_NOME) AS EMIT_NOME,
+    RTRIM(E.INS_ENDERECO) AS EMIT_ENDERECO,
+    ltrim(RTRIM(REPLACE(E.INS_NUMERO, '.', ''))) AS EMIT_NUMERO,
+    dbo.RemoverAcentos(RTRIM(E.INS_BAIRRO)) AS EMIT_BAIRRO,
+    ISNULL(E.COD_MUNICIPIO, 3550308) AS EMIT_COD_MUNICIPIO,
+    dbo.RemoverAcentos(RTRIM(E.INS_MUNICIPIO)) AS EMIT_MUNICIPIO,
+    E.INS_UF AS EMIT_UF,
+    E.INS_CEP AS EMIT_CEP,
+    dbo.fn_LimpaTelefone(E.INS_TELEFONE) AS EMIT_TELEFONE,
+    RTRIM(E.INS_IE) AS EMIT_IE,
+    RTRIM(ISNULL(E.COD_REGIME_TRIBUTARIO, '3')) AS EMIT_CRT,
+    RTRIM(N.sCPF_CNPJ) AS CPFDestinario,
+    RTRIM(N.sNome_Razao) AS NomeDestinario,
+    RTRIM(N.sEndereco) AS EnderecoDestinario,
+    RTRIM(N.sNumero) AS NumeroDestinario,
+    RTRIM(N.sBairro) AS BairroDestinario,
+    RTRIM(N.sMunicipio) AS MunicipioDestinario,
+    ISNULL(N.COD_MUNICIPIO_DEST, 3550308) AS cMunDest,
+    N.sUF AS UFDestinario,
+	replace(RTRIM(N.sCEP),'-','') as CEPDestinario,
+    RTRIM(N.sInscr_Estadual) AS IE,
+    ISNULL(N.nvFrete, 0) AS ValorFrete,
+    ISNULL(N.nvSeg, 0) AS ValorSeguro,
+    ISNULL(N.nvDesc, 0) AS ValorDesconto,
+    'A:\SGM_files\NOTAS_FISCAIS\NFE\NFE_API' AS DIR_BASE
+FROM NOTAFISC N
+INNER JOIN ESCOLAS E ON E.ID_ESCOLA = N.iIdEmitente
+WHERE iIdEmitente in (1,2) and iSituacaoNFe in (0,1,3)";
 
                     DataTable dados = new DataTable();
                     SqlDataAdapter adaptador = new SqlDataAdapter(query, stringConection);
@@ -303,7 +442,21 @@ namespace NFSe.Class
                 {
                     conexao.Open();
 
-                    string query = @"";
+                    string query = @"
+SELECT 
+    RTRIM(N.iIdProduto)       AS Codigo, 
+    RTRIM(N.Descricao_Produto) AS Descricao, 
+    RTRIM(N.sNCM)             AS NCM, 
+    RTRIM(N.unidade)          AS Unidade, 
+    N.nqCom            AS Quantidade, 
+    N.nvUnCom          AS ValorUnitario, 
+    N.nvProd           AS ValorProd, 
+    N.iCFOP           AS CFOP 
+FROM NOTAPRSE N 
+INNER JOIN NOTAFISC NOTA 
+    ON NOTA.inNF = N.inNF 
+   AND NOTA.iIdEmitente = N.iIdEmitente 
+WHERE NOTA.iIdNotaFisc = @idNota;";
 
                     using (var cmd = new SqlCommand(query, conexao))
                     {
@@ -361,7 +514,7 @@ namespace NFSe.Class
                 using (var conexao = AbrirConexao())
                 {
                     conexao.Open();
-                    string query = @"";
+                    string query = @"UPDATE NOTAFISC SET iSituacaoNFe = @sit, sUltimaOperacao = @msg, sChave = @cha, sProtocolAprNFe = @pro, sDtAutorizNFe = @dat WHERE iIdNotaFisc = @id";
                     using (var comando = conexao.CreateCommand())
                     {
                         comando.CommandText = query;

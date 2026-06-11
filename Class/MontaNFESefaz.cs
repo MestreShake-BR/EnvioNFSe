@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
@@ -27,18 +28,25 @@ namespace NFSe.Class
             try
             {
                 PedidoNfe pedidos = pedido;
-                bool producao =  true;
-                string pfx = @"";
-                string senha = "";
+                bool producao = true;
+                string pfx = ConfigurationManager.AppSettings["Cert.Sefaz.Path"]
+                    ?? throw new InvalidOperationException("Chave 'Cert.Sefaz.Path' não encontrada no App.config.");
+                string senha = ConfigurationManager.AppSettings["Cert.Sefaz.Password"]
+                    ?? throw new InvalidOperationException("Chave 'Cert.Sefaz.Password' não encontrada no App.config.");
 
                 int idNota = pedido.iIdNotaFisc;
 
+
+                //1.BUSCA DADOS(Descobre o servidor real)
+                
                 if (pedido == null) throw new Exception($"Nota {idNota} não encontrada");
 
+                //Define a conexão final baseada no servidor retornado pelo SQL
 
-                string pastaEmitente = (pedido.Emitente.CNPJ == "") ? "" : "";
-                
-                string baseDir = $@"";
+                //2.DIRETÓRIOS
+                string pastaEmitente = (pedido.Emitente.CNPJ == "02011984000131") ? "Monitor_Editorial" : "Monitor";
+                //string baseDir = $@"{pedido.DiretorioBase}\{pastaEmitente}";
+                string baseDir = $@"\\10.0.0.11\SGM_files\NOTAS_FISCAIS\NFE\NFE_API\{pastaEmitente}";
 
                 Directory.CreateDirectory($@"{baseDir}\Envio");
                 Directory.CreateDirectory($@"{baseDir}\Retorno");
@@ -103,9 +111,11 @@ namespace NFSe.Class
             string idDest = (p.Emitente.UF.Trim().ToUpper() == p.Destinatario.UF.Trim().ToUpper()) ? "1" : "2";
 
             StringBuilder xmlPr = new StringBuilder();
+            int i = 1;
             foreach (var pr in p.Produtos)
-            {
-                xmlPr.Append($@"<det nItem=""{pr.Item + 1}""><prod><cProd>{pr.Codigo}</cProd><cEAN>SEM GTIN</cEAN><xProd>{pr.Descricao}</xProd><NCM>{pr.NCM}</NCM><CFOP>{pr.CFOP}</CFOP><uCom>{pr.Unidade}</uCom><qCom>{pr.Quantidade:F4}</qCom><vUnCom>{pr.ValorUnitario:F10}</vUnCom><vProd>{pr.ValorProd:F2}</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>{pr.Unidade}</uTrib><qTrib>{pr.Quantidade:F4}</qTrib><vUnTrib>{pr.ValorUnitario:F10}</vUnTrib><indTot>1</indTot></prod><imposto><ICMS><ICMS40><orig>0</orig><CST>41</CST></ICMS40></ICMS><PIS><PISNT><CST>06</CST></PISNT></PIS><COFINS><COFINSNT><CST>06</CST></COFINSNT></COFINS></imposto></det>");
+            {  
+                xmlPr.Append($@"<det nItem=""{i}""><prod><cProd>{pr.Codigo}</cProd><cEAN>SEM GTIN</cEAN><xProd>{pr.Descricao}</xProd><NCM>{pr.NCM}</NCM><CFOP>{pr.CFOP}</CFOP><uCom>{pr.Unidade}</uCom><qCom>{pr.Quantidade:F4}</qCom><vUnCom>{pr.ValorUnitario:F10}</vUnCom><vProd>{pr.ValorProd:F2}</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>{pr.Unidade}</uTrib><qTrib>{pr.Quantidade:F4}</qTrib><vUnTrib>{pr.ValorUnitario:F10}</vUnTrib><indTot>1</indTot></prod><imposto><ICMS><ICMS40><orig>0</orig><CST>41</CST></ICMS40></ICMS><PIS><PISNT><CST>06</CST></PISNT></PIS><COFINS><COFINSNT><CST>06</CST></COFINSNT></COFINS></imposto></det>");
+                i++;
             }
 
             string d = p.Destinatario.CPF?.Trim() ?? "";

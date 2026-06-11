@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Configuration;
 using System.Data;
 using System.IO;
 using System.IO.Compression;
@@ -33,7 +34,7 @@ namespace NFSe.Class
                 public StringWriterWithEncoding(Encoding encoding) => _encoding = encoding;
                 public override Encoding Encoding => _encoding;
             }
-
+            
             private readonly string _urlProducao = "https://sefin.nfse.gov.br/SefinNacional/nfse";
             private readonly X509Certificate2 _certificado;
             private readonly bool _ambiente;
@@ -65,26 +66,44 @@ namespace NFSe.Class
                             {
                                 // DADO QUE JÁ TEM NO BANCO
                                 string numeroRPS = dados.NumeroRps;
-                                // DADOS DO RETORNO DO JSON
-                                int tipoAmbiente = retorno.tipoAmbiente;
-                                string versaoAplicativo = retorno.versaoAplicativo;
-                                DateTime dataHoraProcessamento = retorno.dataHoraProcessamento;
-                                string idDps = retorno.idDps;
-                                string chaveAcesso = retorno.chaveAcesso;
-                                string nfseXmlGZipB64 = retorno.nfseXmlGZipB64;
-
-                                string xmlDescompactado = DescompactarBase64ParaXml(nfseXmlGZipB64);
-                                var doc = XDocument.Parse(xmlDescompactado);
-                                XNamespace ns = "http://www.sped.fazenda.gov.br/nfse";
-                                string numeroNFSe = doc.Descendants(ns + "nNFSe")
-                                                        .FirstOrDefault()?.Value;
-
-                                Console.WriteLine(numeroNFSe);
-
+                                string chaveAcesso = "";
+                                string numeroNFSe;
+                                string situacao;
+                                string mensagem;
 
                                 Banco banco = new Banco();
+                                if (retorno.chaveAcesso == null)
+                                {
+                                    var erro = retorno.erros.First();
 
-                                banco.updateRPS(chaveAcesso, numeroNFSe, numeroRPS, dados.Emitente);
+                                    string codigoErro = erro.Codigo;
+                                    string descricaoErro = erro.Descricao;
+                                    chaveAcesso = "";
+                                    numeroNFSe = "";
+                                    situacao = "3";
+                                    mensagem = codigoErro + " " + descricaoErro;
+                                    banco.updateRPS(chaveAcesso, numeroNFSe, numeroRPS, dados.Emitente, situacao, mensagem);
+                                }
+                                else if (retorno.chaveAcesso != null)
+                                {
+                                    // DADOS DO RETORNO DO JSON
+                                    int tipoAmbiente = retorno.tipoAmbiente;
+                                    string versaoAplicativo = retorno.versaoAplicativo;
+                                    DateTime dataHoraProcessamento = retorno.dataHoraProcessamento;
+                                    string idDps = retorno.idDps;
+                                    chaveAcesso = retorno.chaveAcesso;
+                                    string nfseXmlGZipB64 = retorno.nfseXmlGZipB64;
+                                                                        
+                                    string xmlDescompactado = DescompactarBase64ParaXml(nfseXmlGZipB64);
+                                    var doc = XDocument.Parse(xmlDescompactado);
+                                    XNamespace ns = "http://www.sped.fazenda.gov.br/nfse";
+                                    numeroNFSe = doc.Descendants(ns + "nNFSe")
+                                                            .FirstOrDefault()?.Value;
+
+                                    situacao = "4";
+                                    mensagem = "Lote Processado com Sucesso";
+                                    banco.updateRPS(chaveAcesso, numeroNFSe, numeroRPS, dados.Emitente, situacao, mensagem);
+                                }                                                                
                             }
                             else
                             {
@@ -106,6 +125,7 @@ namespace NFSe.Class
                     throw;
                 }
             }
+           
             private string GerarXmlDps(DadosNfse dados)
             {
                 string id = "DPS" + dados.CodigoMunicipioEmissao + "2" + dados.Prestador.Cnpj + dados.Serie.PadLeft(5, '0') + dados.NumeroRps.PadLeft(15, '0');
@@ -115,11 +135,11 @@ namespace NFSe.Class
                 xmlBuilder.AppendLine("<DPS xmlns=\"http://www.sped.fazenda.gov.br/nfse\" versao=\"1.00\">");
                 xmlBuilder.AppendLine($"<infDPS Id=\"{id}\">");
                 xmlBuilder.AppendLine($"<tpAmb>1</tpAmb>");
-                xmlBuilder.AppendLine($"<dhEmi>{DateTime.Now.ToString("yyyy-MM-ddTHH:mm:sszzz")}</dhEmi>");
+                xmlBuilder.AppendLine($"<dhEmi>{DateTime.Now:yyyy-MM-ddTHH:mm:sszzz}</dhEmi>");
                 xmlBuilder.AppendLine($"<verAplic>Teste IM 1.0</verAplic>");
                 xmlBuilder.AppendLine($"<serie>{dados.Serie.PadLeft(5, '0')}</serie>");
                 xmlBuilder.AppendLine($"<nDPS>{dados.NumeroRps}</nDPS>");
-                xmlBuilder.AppendLine($"<dCompet>{dados.DataCompetencia.ToString("yyyy-MM-dd")}</dCompet>");
+                xmlBuilder.AppendLine($"<dCompet>{dados.DataCompetencia:yyyy-MM-dd}</dCompet>");
                 xmlBuilder.AppendLine($"<tpEmit>1</tpEmit>");
                 xmlBuilder.AppendLine($"<cLocEmi>{dados.CodigoMunicipioEmissao}</cLocEmi>");
                 xmlBuilder.AppendLine($"<prest>");
@@ -241,14 +261,13 @@ namespace NFSe.Class
 
                 XmlDocument doc = new XmlDocument { PreserveWhitespace = true };
                 doc.LoadXml(xml);
-                XmlElement infDps = doc.DocumentElement["infDPS"];
-                if (infDps == null)
-                    throw new Exception("Elemento infDPS não encontrado para assinatura");
-
+                XmlElement infDps = doc.DocumentElement["infDPS"] ?? throw new Exception("Elemento infDPS não encontrado para assinatura");
                 string id = infDps.GetAttribute("Id");
 
-                SignedXml signedXml = new SignedXml(doc);
-                signedXml.SigningKey = _certificado.GetRSAPrivateKey();
+                SignedXml signedXml = new SignedXml(doc)
+                {
+                    SigningKey = _certificado.GetRSAPrivateKey()
+                };
                 Reference reference = new Reference($"#{id}");
                 reference.AddTransform(new XmlDsigEnvelopedSignatureTransform());
                 reference.AddTransform(new XmlDsigC14NTransform());
@@ -359,7 +378,7 @@ namespace NFSe.Class
 
                 using (var memoryStream = new MemoryStream())
                 {
-                    using (var gzipStream = new GZipStream(memoryStream, CompressionMode.Compress, true))
+                    using (var gzipStream = new GZipStream(memoryStream, CompressionMode.Compress, true)) // ← note o 'true' aqui
                     {
                         gzipStream.Write(xmlBytes, 0, xmlBytes.Length);
                     }
@@ -541,22 +560,18 @@ namespace NFSe.Class
 
         static X509Certificate2 CarregarCertificado(string emitente)
         {
-            string CERT_PATH = "";
-            string CERT_PASSWORD = "";
+            string certPathKey = $"Cert.Emitente{emitente}.Path";
+            string certPasswordKey = $"Cert.Emitente{emitente}.Password";
 
-            if (emitente == "")
-            {
-                CERT_PATH = "";
-                CERT_PASSWORD = "";
-            }
-            else if (emitente == "")
-            {
-                CERT_PATH = "";
-                CERT_PASSWORD = "";
-            }        
+            string certPath = ConfigurationManager.AppSettings[certPathKey];
+            string certPassword = ConfigurationManager.AppSettings[certPasswordKey];
+
+            if (string.IsNullOrWhiteSpace(certPath))
+                throw new InvalidOperationException($"Chave '{certPathKey}' não encontrada ou vazia no App.config.");
+
             try
             {
-                var certificado = new X509Certificate2(CERT_PATH, CERT_PASSWORD, X509KeyStorageFlags.Exportable);
+                var certificado = new X509Certificate2(certPath, certPassword, X509KeyStorageFlags.Exportable);
                 if (!certificado.HasPrivateKey)
                     throw new Exception("Certificado não possui chave privada");
 
@@ -567,7 +582,7 @@ namespace NFSe.Class
             }
             catch (Exception ex)
             {
-                throw new Exception($"Erro ao carregar certificado: {ex.Message}");
+                throw new Exception($"Erro ao carregar certificado do emitente {emitente}: {ex.Message}");
             }
         }
     }

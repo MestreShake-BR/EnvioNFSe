@@ -28,6 +28,9 @@ namespace NFSe
         #region DEBUGAR UM METODO
         static void Main()
         {
+            CultureInfo culture = CultureInfo.InvariantCulture;
+            CultureInfo.DefaultThreadCurrentCulture = culture;
+            CultureInfo.DefaultThreadCurrentUICulture = culture;
 #if (!DEBUG)
             ServiceBase[] ServicesToRun;
 
@@ -41,6 +44,7 @@ namespace NFSe
 #else
             MontaDPS.Envio().GetAwaiter().GetResult();
             MontaRPSSP.EnvioSP().GetAwaiter().GetResult();
+            MontaNFESefaz.Envio().GetAwaiter().GetResult();
 #endif
         }
         #endregion DEBUGAR UM METODO
