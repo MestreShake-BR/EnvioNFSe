@@ -29,13 +29,21 @@ namespace NFSe.Class
             {
                 PedidoNfe pedidos = pedido;
                 bool producao = true;
-                string pfx = ConfigurationManager.AppSettings["Cert.Sefaz.Path"]
-                    ?? throw new InvalidOperationException("Chave 'Cert.Sefaz.Path' não encontrada no App.config.");
+                string pfx = ConfigurationManager.AppSettings["Cert.Sefaz.Path"];
+
+                if (pedido.iIdEmitente == "1")
+                {
+                    pfx = ConfigurationManager.AppSettings["Cert.Emitente1.Path"];
+                }
+                else
+                {
+                  pfx = ConfigurationManager.AppSettings["Cert.Sefaz.Path"];
+                }
+                    
                 string senha = ConfigurationManager.AppSettings["Cert.Sefaz.Password"]
                     ?? throw new InvalidOperationException("Chave 'Cert.Sefaz.Password' não encontrada no App.config.");
 
                 int idNota = pedido.iIdNotaFisc;
-
 
                 //1.BUSCA DADOS(Descobre o servidor real)
                 
@@ -114,7 +122,7 @@ namespace NFSe.Class
             int i = 1;
             foreach (var pr in p.Produtos)
             {  
-                xmlPr.Append($@"<det nItem=""{i}""><prod><cProd>{pr.Codigo}</cProd><cEAN>SEM GTIN</cEAN><xProd>{pr.Descricao}</xProd><NCM>{pr.NCM}</NCM><CFOP>{pr.CFOP}</CFOP><uCom>{pr.Unidade}</uCom><qCom>{pr.Quantidade:F4}</qCom><vUnCom>{pr.ValorUnitario:F10}</vUnCom><vProd>{pr.ValorProd:F2}</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>{pr.Unidade}</uTrib><qTrib>{pr.Quantidade:F4}</qTrib><vUnTrib>{pr.ValorUnitario:F10}</vUnTrib><indTot>1</indTot></prod><imposto><ICMS><ICMS40><orig>0</orig><CST>41</CST></ICMS40></ICMS><PIS><PISNT><CST>06</CST></PISNT></PIS><COFINS><COFINSNT><CST>06</CST></COFINSNT></COFINS></imposto></det>");
+                xmlPr.Append($@"<det nItem=""{i}""><prod><cProd>{pr.Codigo}</cProd><cEAN>SEM GTIN</cEAN><xProd>{pr.Descricao}</xProd><NCM>{pr.NCM}</NCM><cBenef>SP099999</cBenef><CFOP>{pr.CFOP}</CFOP><uCom>{pr.Unidade}</uCom><qCom>{pr.Quantidade:F4}</qCom><vUnCom>{pr.ValorUnitario:F10}</vUnCom><vProd>{pr.ValorProd:F2}</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>{pr.Unidade}</uTrib><qTrib>{pr.Quantidade:F4}</qTrib><vUnTrib>{pr.ValorUnitario:F10}</vUnTrib><indTot>1</indTot></prod><imposto><ICMS><ICMS40><orig>0</orig><CST>41</CST></ICMS40></ICMS><PIS><PISNT><CST>06</CST></PISNT></PIS><COFINS><COFINSNT><CST>06</CST></COFINSNT></COFINS></imposto></det>");
                 i++;
             }
 
@@ -207,6 +215,7 @@ namespace NFSe.Class
 
                 var pedido = new PedidoNfe
                 {
+                    iIdEmitente = dados1.iIdEmitente,
                     iIdNotaFisc = idNota,
                     Serie = dados1.Serie,
                     InNF = dados1.InNF,
