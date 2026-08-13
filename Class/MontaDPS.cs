@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Configuration;
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -34,7 +35,7 @@ namespace NFSe.Class
                 public StringWriterWithEncoding(Encoding encoding) => _encoding = encoding;
                 public override Encoding Encoding => _encoding;
             }
-            
+
             private readonly string _urlProducao = "https://sefin.nfse.gov.br/SefinNacional/nfse";
             private readonly X509Certificate2 _certificado;
             private readonly bool _ambiente;
@@ -93,7 +94,7 @@ namespace NFSe.Class
                                     string idDps = retorno.idDps;
                                     chaveAcesso = retorno.chaveAcesso;
                                     string nfseXmlGZipB64 = retorno.nfseXmlGZipB64;
-                                                                        
+
                                     string xmlDescompactado = DescompactarBase64ParaXml(nfseXmlGZipB64);
                                     var doc = XDocument.Parse(xmlDescompactado);
                                     XNamespace ns = "http://www.sped.fazenda.gov.br/nfse";
@@ -103,7 +104,7 @@ namespace NFSe.Class
                                     situacao = "4";
                                     mensagem = "Lote Processado com Sucesso";
                                     banco.updateRPS(chaveAcesso, numeroNFSe, numeroRPS, dados.Emitente, situacao, mensagem);
-                                }                                                                
+                                }
                             }
                             else
                             {
@@ -125,7 +126,7 @@ namespace NFSe.Class
                     throw;
                 }
             }
-           
+
             private string GerarXmlDps(DadosNfse dados)
             {
                 string id = "DPS" + dados.CodigoMunicipioEmissao + "2" + dados.Prestador.Cnpj + dados.Serie.PadLeft(5, '0') + dados.NumeroRps.PadLeft(15, '0');
@@ -135,7 +136,7 @@ namespace NFSe.Class
                 xmlBuilder.AppendLine("<DPS xmlns=\"http://www.sped.fazenda.gov.br/nfse\" versao=\"1.00\">");
                 xmlBuilder.AppendLine($"<infDPS Id=\"{id}\">");
                 xmlBuilder.AppendLine($"<tpAmb>1</tpAmb>");
-                xmlBuilder.AppendLine($"<dhEmi>{DateTime.Now:yyyy-MM-ddTHH:mm:sszzz}</dhEmi>");
+                xmlBuilder.AppendLine($"<dhEmi>{dados.DataEmissao:yyyy-MM-ddTHH:mm:sszzz}</dhEmi>");
                 xmlBuilder.AppendLine($"<verAplic>Teste IM 1.0</verAplic>");
                 xmlBuilder.AppendLine($"<serie>{dados.Serie.PadLeft(5, '0')}</serie>");
                 xmlBuilder.AppendLine($"<nDPS>{dados.NumeroRps}</nDPS>");
@@ -230,14 +231,28 @@ namespace NFSe.Class
                 xmlBuilder.AppendLine($"<pAliqCofins>{dados.Servico.ALIQ_COFINS}</pAliqCofins>");
                 xmlBuilder.AppendLine($"<vPis>{dados.Servico.ValorPIS}</vPis>");
                 xmlBuilder.AppendLine($"<vCofins>{dados.Servico.ValorCofins}</vCofins>");
-                xmlBuilder.AppendLine($"<tpRetPisCofins>2</tpRetPisCofins>");
+                if (dados.Servico.Natureza_Retencao_Fonte.Trim(' ').TrimStart('0') != null && dados.Servico.Natureza_Retencao_Fonte.Trim(' ').TrimStart('0') != "")
+                {
+                    xmlBuilder.AppendLine($"<tpRetPisCofins>{dados.Servico.Natureza_Retencao_Fonte.TrimStart('0')}</tpRetPisCofins>");
+                }
+              
                 xmlBuilder.AppendLine($"</piscofins>");
+                // Campos opcionais: só devem ser enviados quando houver retenção (> 0).
+                // O padrão nacional rejeita vRetIRRF/vRetCSLL iguais a zero (erro E0700).
+                if (decimal.TryParse(dados.Servico.ValorIR, NumberStyles.Any, CultureInfo.InvariantCulture, out var vRetIRRF) && vRetIRRF > 0)
+                {
+                    xmlBuilder.AppendLine($"<vRetIRRF>{dados.Servico.ValorIR}</vRetIRRF>");
+                }
+                if (decimal.TryParse(dados.Servico.ValorContribuicaoSocial, NumberStyles.Any, CultureInfo.InvariantCulture, out var vRetCSLL) && vRetCSLL > 0)
+                {
+                    xmlBuilder.AppendLine($"<vRetCSLL>{dados.Servico.ValorContribuicaoSocial}</vRetCSLL>");
+                }
                 xmlBuilder.AppendLine($"</tribFed>");
                 xmlBuilder.AppendLine($"<totTrib>");
                 xmlBuilder.AppendLine($"<pTotTrib>");
-                xmlBuilder.AppendLine($"<pTotTribFed>1.00</pTotTribFed>");
-                xmlBuilder.AppendLine($"<pTotTribEst>1.00</pTotTribEst>");
-                xmlBuilder.AppendLine($"<pTotTribMun>1.00</pTotTribMun>");
+                xmlBuilder.AppendLine($"<pTotTribFed>{dados.Servico.PercentualTotalTributosFederais}</pTotTribFed>");
+                xmlBuilder.AppendLine($"<pTotTribEst>{0.00}</pTotTribEst>");
+                xmlBuilder.AppendLine($"<pTotTribMun>{dados.Servico.Aliquota}</pTotTribMun>");
                 xmlBuilder.AppendLine($"</pTotTrib>");
                 xmlBuilder.AppendLine($"</totTrib>");
                 xmlBuilder.AppendLine($"</trib>");
@@ -524,19 +539,21 @@ namespace NFSe.Class
                                 BaseCalculo = dados1.Servico.BaseCalculo,
                                 Aliquota = dados1.Servico.Aliquota,
                                 ValorISS = dados1.Servico.ValorISS,
-                                ValorPIS = dados1.Servico.ValorPIS,
-                                ValorCofins = dados1.Servico.ValorCofins,
+                                ValorPIS = Convert.ToDecimal(dados1.Servico.ValorPISRET) > 0 ? dados1.Servico.ValorPISRET : dados1.Servico.ValorPIS,
+                                ValorCofins = Convert.ToDecimal(dados1.Servico.ValorPISRET) > 0 ? dados1.Servico.ValorCofinsRET : dados1.Servico.ValorCofins,
                                 ValorDeducoes = dados1.Servico.ValorDeducoes,
                                 BaseDeCalculoRetencoes = dados1.Servico.BaseDeCalculoRetencoes,
                                 PercentualIR = dados1.Servico.PercentualIR,
                                 ValorIR = dados1.Servico.ValorIR,
                                 PercentualContribuicaoSocial = dados1.Servico.PercentualContribuicaoSocial,
-                                ValorContribuicaoSocial = dados1.Servico.ValorContribuicaoSocial,
+                                ValorContribuicaoSocial = Convert.ToDecimal(dados1.Servico.ValorPISRET) > 0 ? dados1.Servico.ValorContribuicaoSocialRET : dados1.Servico.ValorContribuicaoSocial,
                                 CSTPIS = dados1.Servico.CSTPIS,
                                 CSTCOFINS = dados1.Servico.CSTCOFINS,
-                                ALIQ_PIS = dados1.Servico.ALIQ_PIS,
-                                ALIQ_COFINS = dados1.Servico.ALIQ_COFINS,
-                                ALIQ_ISS = dados1.Servico.ALIQ_ISS
+                                ALIQ_PIS = Convert.ToDecimal(dados1.Servico.ValorPISRET) > 0 ? dados1.Servico.ALIQ_PISRET : dados1.Servico.ALIQ_PIS,
+                                ALIQ_COFINS = Convert.ToDecimal(dados1.Servico.ValorPISRET) > 0 ? dados1.Servico.ALIQ_COFINSRET : dados1.Servico.ALIQ_COFINS,
+                                ALIQ_ISS = dados1.Servico.ALIQ_ISS,
+                                PercentualTotalTributosFederais = dados1.Servico.PercentualTotalTributosFederais,
+                                Natureza_Retencao_Fonte = dados1.Servico.Natureza_Retencao_Fonte
                             }
                         };
 
