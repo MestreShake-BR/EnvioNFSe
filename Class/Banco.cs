@@ -65,7 +65,6 @@ namespace NFSe.Class
     sDiscriminacao,
     nVlServicos,
     nVlLiqNFSe,
-    nAliquota,
     nBaseCalculo,
     iISSRetido,
 	nVlISS,
@@ -73,19 +72,36 @@ namespace NFSe.Class
     nVlCofins,
     nVlDeducoes,
     nBase_Calculo_Retencoes,
-    nPerc_IR,
     nVlIR,
-    nPerc_CSLL,
     nVlCsll,
 	sCSTPIS,
 	sCSTCOFINS,
     T.ALIQ_PIS
     ,T.ALIQ_COFINS
     ,T.ALIQ_ISS
+    ,nVal_Pis_ret
+    ,nVal_Cofins_ret
+    ,cast(RPS.nPerc_Pis_ret as decimal(10,2)) as nPerc_Pis_ret 
+    ,cast(RPS.nPerc_Cofins_ret as decimal(10,2)) as nPerc_Cofins_ret 
+    ,cast(RPS.nAliquota as decimal(10,2)) as nAliquota 
+    ,cast(RPS.nPerc_IR as decimal(10,2)) as nPerc_IR 
+    ,cast(RPS.nPerc_CSLL as decimal(10,2)) as nPerc_CSLL 
+    ,cast(RPS.nPerc_INSS as decimal(10,2)) as nPerc_INSS 
+    ,CAST(
+    (RPS.nPerc_Pis_ret +
+     RPS.nPerc_Cofins_ret +
+     RPS.nAliquota +
+     RPS.nPerc_IR +
+     RPS.nPerc_INSS +
+     RPS.nPerc_CSLL) AS DECIMAL(10,2)) as pTotTribFed
+    ,Natureza_Retencao_Fonte
+    ,(RPS.nVal_Pis_ret + RPS.nVal_Cofins_ret  + RPS.nVlCsll) TotContribuicoes
+	,RPS.ddataemissao
 FROM [SGM_GERAL].[dbo].rps RPS
 INNER JOIN [SGM_GERAL].[dbo].TABELA_SERVICOS T ON T.COD_SERVICO = RPS.sItemListaServi AND T.ID_ESCOLA = RPS.iID_Emitente
 WHERE iID_Emitente in (3,10) AND iSituacao in (0,1,3)
-ORDER BY RPS.recnum DESC";
+ORDER BY RPS.recnum DESC
+";
                     DataTable dados = new DataTable();
                     SqlDataAdapter adaptador = new SqlDataAdapter(query, stringConection);
                     adaptador.Fill(dados);
@@ -150,12 +166,11 @@ ORDER BY RPS.recnum DESC";
             dados.Tomador.Endereco = new EnderecoNfse();
             dados.Tomador.Contato = new ContatoNfse();
             dados.Servico = new ServicoNfse();
-
             dados.Emitente = dr["iID_Emitente"]?.ToString() ?? "";
             dados.NumeroRps = dr["nNumero"]?.ToString() ?? "";
             dados.Serie = dr["sSerie"]?.ToString() ?? "";
-            dados.DataEmissao = DateTime.Now;
-            dados.DataCompetencia = DateTime.Now;
+            dados.DataEmissao = dr["ddataemissao"] == DBNull.Value ? DateTime.Now : Convert.ToDateTime(dr["ddataemissao"]);
+            dados.DataCompetencia = dr["ddataemissao"] == DBNull.Value ? DateTime.Now : Convert.ToDateTime(dr["ddataemissao"]);
             dados.CodigoMunicipioEmissao = dr["sCdMunicipio"]?.ToString() ?? "";
             dados.Prestador.Cnpj = dr["sCNPJPrestador"]?.ToString() ?? "";
             dados.Prestador.InscricaoMunicipal = dr["sIMPrestador"]?.ToString() ?? "";
@@ -186,18 +201,25 @@ ORDER BY RPS.recnum DESC";
             dados.Servico.TipoRetencaoISSQN = dr["iISSRetido"]?.ToString() ?? "1";
             dados.Servico.ValorISS = dr["nVlISS"]?.ToString() ?? "";
             dados.Servico.ValorPIS = dr["nVlPis"]?.ToString() ?? "";
+            dados.Servico.ValorPISRET = dr["nVal_Pis_ret"]?.ToString() ?? "";
             dados.Servico.ValorCofins = dr["nVlCofins"]?.ToString() ?? "";
+            dados.Servico.ValorCofinsRET = dr["nVal_Cofins_ret"]?.ToString() ?? "";
             dados.Servico.ValorDeducoes = dr["nVlDeducoes"]?.ToString() ?? "";
             dados.Servico.BaseDeCalculoRetencoes = dr["nBase_Calculo_Retencoes"]?.ToString() ?? "";
             dados.Servico.PercentualIR = dr["nPerc_IR"]?.ToString() ?? "";
             dados.Servico.ValorIR = dr["nVlIR"]?.ToString() ?? "";
             dados.Servico.PercentualContribuicaoSocial = dr["nPerc_CSLL"]?.ToString() ?? "";
             dados.Servico.ValorContribuicaoSocial = dr["nVlCsll"]?.ToString() ?? "";
+            dados.Servico.ValorContribuicaoSocialRET = dr["TotContribuicoes"]?.ToString() ?? "";
             dados.Servico.CSTPIS = dr["sCSTPIS"]?.ToString() ?? "";
             dados.Servico.CSTCOFINS = dr["sCSTCOFINS"]?.ToString() ?? "";
+            dados.Servico.PercentualTotalTributosFederais = dr["pTotTribFed"]?.ToString() ?? "";
+            dados.Servico.Natureza_Retencao_Fonte = dr["Natureza_Retencao_Fonte"]?.ToString() ?? ""; 
             // ALQUOTA PIS COFINS
             dados.Servico.ALIQ_PIS = dr["ALIQ_PIS"]?.ToString() ?? "";
+            dados.Servico.ALIQ_PISRET = dr["nPerc_Pis_ret"]?.ToString() ?? "";
             dados.Servico.ALIQ_COFINS = dr["ALIQ_COFINS"]?.ToString() ?? "";
+            dados.Servico.ALIQ_COFINSRET = dr["nPerc_Cofins_ret"]?.ToString() ?? "";
             dados.Servico.ALIQ_ISS = dr["ALIQ_ISS"]?.ToString() ?? "";
             return dados;
         }
@@ -216,7 +238,7 @@ ORDER BY RPS.recnum DESC";
                 {
                     conexao.Open();
                     string query = @"SELECT 
-	 iID_Emitente,
+	                    iID_Emitente,
                         RTRIM(nNumero)                AS nNumero,
                         RTRIM(sSerie)                 AS sSerie,
                         RTRIM(sCdMunicipio)           AS sCdMunicipio,
@@ -256,6 +278,18 @@ ORDER BY RPS.recnum DESC";
                         '0'                           AS finNFSe,
                         '0'                           AS indDest,
                         '000001'                      AS cClassTrib
+                        ,Natureza_Retencao_Fonte
+						,nVal_Pis_ret
+						,nVal_Cofins_ret
+                        ,Zerar_Impostos
+                        ,RPS.ddataemissao
+                        -- NOVOS CAMPOS
+                        ,COD_NBS
+                        ,CST_IBS_CBS
+                        ,CLASSIF_TRIBUTARIA_IBS_CBS
+                        ,REDUCAO_PERCENT_IBS_CBS
+                        ,ALIQUOTA_IBS
+                        ,ALIQUOTA_CBS
 FROM [SGM_GERAL].[dbo].rps 
 WHERE iID_Emitente in (1,2) AND iSituacao in (0,1,3)
 ORDER BY iID_Emitente, iSituacao asc
@@ -352,13 +386,17 @@ WHERE iID_Emitente = @IdEmitente
             dados.nAliquota = dr["nAliquota"].ToString() ?? "0.00";
             dados.nBaseCalculo = dr["nBaseCalculo"].ToString() ?? "1.00";
             dados.iISSRetido = dr["iISSRetido"]?.ToString() ?? "1";
-            dados.nVlIR = dr["nVlISS"]?.ToString() ?? "";
-            dados.nVlPis = dr["nVlPis"]?.ToString() ?? "";
-            dados.nVlCofins = dr["nVlCofins"]?.ToString() ?? "";
-            dados.nVlDeducoes = dr["nVlDeducoes"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["nVlDeducoes"]);
+            dados.nVlIR = dr["nVlISS"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["nVlISS"]);
+            dados.nVlPis = dr["nVlPis"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["nVlPis"]);
+            dados.nVlCofins = dr["nVlCofins"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["nVlCofins"]);
+            dados.nVlPis_RET = dr["nVal_Pis_ret"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["nVal_Pis_ret"]);
+            dados.nVlCofins_RET = dr["nVal_Cofins_ret"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["nVal_Cofins_ret"]);
 
-            dados.nVlIR = dr["nVlIR"]?.ToString() ?? "";
-            dados.nVlCsll = dr["nVlCsll"]?.ToString() ?? "";
+            dados.nVlDeducoes = dr["nVlDeducoes"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["nVlDeducoes"]);
+            dados.Natureza_Retencao_Fonte = dr["Natureza_Retencao_Fonte"]?.ToString() ?? "";
+
+            dados.nVlIR = dr["nVlIR"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["nVlIR"]);
+            dados.nVlCsll = dr["nVlCsll"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["nVlCsll"]);
 
             dados.sTributacaoRPS = dr["sTributacaoRPS"]?.ToString() ?? "";
             //dados.ValorInicialCobrado = dr["ValorInicialCobrado"]?.ToString() ?? "";
@@ -368,6 +406,15 @@ WHERE iID_Emitente = @IdEmitente
             dados.cIndOp = dr["cIndOp"]?.ToString() ?? "";
             dados.indDest = dr["indDest"]?.ToString() ?? "";
             dados.cClassTrib = dr["cClassTrib"]?.ToString() ?? "";
+            dados.Zerar_Impostos = dr["Zerar_Impostos"]?.ToString() ?? "";
+            dados.DataEmissao = dr["ddataemissao"] == DBNull.Value ? DateTime.Now : Convert.ToDateTime(dr["ddataemissao"]);
+            // IBS CBS
+            dados.COD_NBS = dr["COD_NBS"]?.ToString() ?? "";
+            dados.CST_IBS_CBS = dr["CST_IBS_CBS"]?.ToString() ?? "";
+            dados.CLASSIF_TRIBUTARIA_IBS_CBS = dr["CLASSIF_TRIBUTARIA_IBS_CBS"]?.ToString() ?? "";
+            dados.REDUCAO_PERCENT_IBS_CBS = dr["REDUCAO_PERCENT_IBS_CBS"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["REDUCAO_PERCENT_IBS_CBS"]);
+            dados.ALIQUOTA_IBS = dr["ALIQUOTA_IBS"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["ALIQUOTA_IBS"]);
+            dados.ALIQUOTA_CBS = dr["ALIQUOTA_CBS"] == DBNull.Value ? 1.00m : Convert.ToDecimal(dr["ALIQUOTA_CBS"]);
 
             return dados;
         }
@@ -385,8 +432,8 @@ WHERE iID_Emitente = @IdEmitente
                 try
                 {
                     conexao.Open();
-                    string query = @"
-SELECT iIdNotaFisc,
+                    string query = @"SELECT iIdEmitente,
+    iIdNotaFisc,
     N.iSerie AS Serie,
     ISNULL(NULLIF(N.inNF, 0), N.iIdNotaFisc) AS inNF,
     N.dEmi AS DataEmissao,
@@ -451,7 +498,8 @@ SELECT
     N.nqCom            AS Quantidade, 
     N.nvUnCom          AS ValorUnitario, 
     N.nvProd           AS ValorProd, 
-    N.iCFOP           AS CFOP 
+    N.iCFOP           AS CFOP,
+    N.sCSTICMS
 FROM NOTAPRSE N 
 INNER JOIN NOTAFISC NOTA 
     ON NOTA.inNF = N.inNF 
@@ -540,7 +588,7 @@ WHERE NOTA.iIdNotaFisc = @idNota;";
             if (dados.Emitente == null) dados.Emitente = new Emitente();
             if (dados.Destinatario == null) dados.Destinatario = new Destinatario();
             if (dados.Produtos == null) dados.Produtos = new List<Produto>();
-
+            dados.iIdEmitente = dr["iIdEmitente"] == DBNull.Value ? string.Empty : dr["iIdEmitente"]?.ToString() ?? string.Empty;
             dados.iIdNotaFisc = dr["iIdNotaFisc"] == DBNull.Value ? 0 : Convert.ToInt32(dr["iIdNotaFisc"]);
             dados.Serie = dr["Serie"] == DBNull.Value ? 0 : Convert.ToInt32(dr["Serie"]);
             dados.InNF = dr["inNF"] == DBNull.Value ? 0m : Convert.ToDecimal(dr["inNF"]);
@@ -576,7 +624,6 @@ WHERE NOTA.iIdNotaFisc = @idNota;";
             dados.ValorSeguro = dr["ValorSeguro"] == DBNull.Value ? 0m : Convert.ToDecimal(dr["ValorSeguro"]);
             dados.ValorDesconto = dr["ValorDesconto"] == DBNull.Value ? 0m : Convert.ToDecimal(dr["ValorDesconto"]);
             dados.DiretorioBase = dr["DIR_BASE"] == DBNull.Value ? string.Empty : dr["DIR_BASE"]?.ToString() ?? string.Empty;
-
             return dados;
         }
 
@@ -597,7 +644,8 @@ WHERE NOTA.iIdNotaFisc = @idNota;";
                     Quantidade = SafeGetDecimal(r, "Quantidade"),
                     ValorUnitario = SafeGetDecimal(r, "ValorUnitario"),
                     ValorProd = SafeGetDecimal(r, "ValorProd"),
-                    CFOP = SafeGetInt(r, "CFOP")
+                    CFOP = SafeGetInt(r, "CFOP"),
+                    CST = SafeGetString(r, "sCSTICMS")
                 };
 
                 produtos.Add(p);

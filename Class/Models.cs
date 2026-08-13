@@ -79,18 +79,23 @@ namespace NFSe.Class
         public string PercentualTotalTributosMunicipais { get; set; } = "";
         public string ValorISS { get; set; } = "";
         public string ValorPIS { get; set; } = "";
+        public string ValorPISRET { get; set; } = "";
         public string ValorCofins { get; set; } = "";
+        public string ValorCofinsRET { get; set; } = "";
         public string ValorDeducoes { get; set; } = "";
         public string BaseDeCalculoRetencoes { get; set; } = "";
         public string PercentualIR { get; set; } = "";
         public string ValorIR { get; set; } = "";
         public string PercentualContribuicaoSocial { get; set; } = "";
         public string ValorContribuicaoSocial { get; set; } = "";
+        public string ValorContribuicaoSocialRET { get; set; } = "";
         public string CSTPIS { get; set; } = "";
         public string CSTCOFINS { get; set; } = "";
-
+        public string Natureza_Retencao_Fonte { get; set; } = "";
         public string ALIQ_PIS { get; set; } = "";
+        public string ALIQ_PISRET { get; set; } = "";
         public string ALIQ_COFINS { get; set; } = "";
+        public string ALIQ_COFINSRET { get; set; } = "";
         public string ALIQ_ISS { get; set; } = "";
 
     }
@@ -156,22 +161,36 @@ namespace NFSe.Class
         public string nBaseCalculo { get; set; }
         public string iISSRetido { get; set; }
         public string nVlISS { get; set; }
-        public string nVlPis { get; set; }
-        public string nVlCofins { get; set; }
+        public decimal nVlPis { get; set; }
+        public decimal nVlCofins { get; set; }
+        public decimal nVlPis_RET { get; set; }
+        public decimal nVlCofins_RET { get; set; }
         public decimal nVlDeducoes { get; set; }
-        public string nVlIR { get; set; }
-        public string nVlCsll { get; set; }
+        public decimal nVlIR { get; set; }
+        public decimal nVlCsll { get; set; }
         public string indFinal { get; set; }
         public string cIndOp { get; set; }
         public string finNFSe { get; set; }
         public string indDest { get; set; }
         public string cClassTrib { get; set; }
+        public string Natureza_Retencao_Fonte { get; set; }
+        public string Zerar_Impostos { get; set; }
+        public DateTime DataEmissao { get; set; }
+
+        // IBS  CBS
+        public string COD_NBS { get; set; }
+        public string CST_IBS_CBS { get; set; }
+        public string CLASSIF_TRIBUTARIA_IBS_CBS { get; set; }
+        public decimal REDUCAO_PERCENT_IBS_CBS { get; set; }
+        public decimal ALIQUOTA_IBS { get; set; }
+        public decimal ALIQUOTA_CBS { get; set; }
     }
     #endregion
 
     #region Models para SEFAZ SP
     public class PedidoNfe
     {
+        public string iIdEmitente { get; set; }
         public int iIdNotaFisc { get; set; }
         public int Serie { get; set; }
         public decimal InNF { get; set; }
@@ -185,6 +204,8 @@ namespace NFSe.Class
         public decimal ValorSeguro { get; set; }
         public decimal ValorDesconto { get; set; }
         public string DiretorioBase { get; set; }
+        
+
     }
     public class Emitente
     {
@@ -225,6 +246,7 @@ namespace NFSe.Class
         public decimal ValorUnitario { get; set; }
         public decimal ValorProd { get; set; }
         public int CFOP { get; set; }
+        public string CST { get; set; }
     }
 }
     #endregion
