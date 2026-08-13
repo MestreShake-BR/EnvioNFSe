@@ -14,6 +14,7 @@ using System.Security.Cryptography.Xml;
 using System.ServiceProcess;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
@@ -38,7 +39,7 @@ namespace NFSe.Class
                 public StringWriterWithEncoding(Encoding encoding) => _encoding = encoding;
                 public override Encoding Encoding => _encoding;
             }
-                        
+
             private readonly X509Certificate2 _certificado;
             private readonly bool _ambiente;
 
@@ -142,12 +143,21 @@ namespace NFSe.Class
                 string tagTomador = dados.sCNPJCPFTomador.Length > 11 ? "CNPJ" : "CPF";
                 string deducoes = dados.nVlDeducoes.ToString("0.00", CultureInfo.InvariantCulture);
 
+                string nbs = string.IsNullOrWhiteSpace(dados.COD_NBS) ? "122051900" : dados.COD_NBS.Trim();
+
+                // O schema de SP (tpGIBSCBS) aceita somente cClassTrib e o grupo opcional gTribRegular.
+                // O CST e os valores de IBS/CBS não são enviados: a prefeitura os deriva do cClassTrib
+                // (ex.: 200001 = CST 200, alíquota reduzida).
+                string cClassTrib = string.IsNullOrWhiteSpace(dados.CLASSIF_TRIBUTARIA_IBS_CBS)
+                    ? dados.cClassTrib
+                    : dados.CLASSIF_TRIBUTARIA_IBS_CBS.Trim();
+
                 string xmlRaw = $@"<PedidoEnvioLoteRPS xmlns=""{NAMESPACE_SP}"">
 <Cabecalho Versao=""2"" xmlns="""">
     <CPFCNPJRemetente><CNPJ>{dados.sCNPJPrestador}</CNPJ></CPFCNPJRemetente>
     <transacao>true</transacao>
-    <dtInicio>{DateTime.Now:yyyy-MM-dd}</dtInicio>
-    <dtFim>{DateTime.Now:yyyy-MM-dd}</dtFim>
+    <dtInicio>{dados.DataEmissao:yyyy-MM-dd}</dtInicio>
+    <dtFim>{dados.DataEmissao:yyyy-MM-dd}</dtFim>
     <QtdRPS>1</QtdRPS>
 </Cabecalho>
 <RPS xmlns="""">
@@ -158,7 +168,7 @@ namespace NFSe.Class
         <NumeroRPS>{dados.nNumero}</NumeroRPS>
     </ChaveRPS>
     <TipoRPS>RPS</TipoRPS>
-    <DataEmissao>{DateTime.Now:yyyy-MM-dd}</DataEmissao>
+    <DataEmissao>{dados.DataEmissao:yyyy-MM-dd}</DataEmissao>
     <StatusRPS>N</StatusRPS>
     <TributacaoRPS>{dados.sTributacaoRPS}</TributacaoRPS>
     <ValorDeducoes>{deducoes}</ValorDeducoes>
@@ -181,21 +191,22 @@ namespace NFSe.Class
         <CEP>{dados.sCEPTomador}</CEP>
     </EnderecoTomador>
     <Discriminacao>{dados.sDiscriminacao}</Discriminacao>
+    <RetencaoPisCofins>{dados.Natureza_Retencao_Fonte}</RetencaoPisCofins>
     <ValorFinalCobrado>{dados.ValorInicialCobrado}</ValorFinalCobrado>
     <ValorIPI>0.00</ValorIPI>
     <ExigibilidadeSuspensa>0</ExigibilidadeSuspensa>
     <PagamentoParceladoAntecipado>0</PagamentoParceladoAntecipado>
-    <NBS>122051900</NBS>
+    <NBS>{nbs}</NBS>
     <cLocPrestacao>3550308</cLocPrestacao>
     <IBSCBS>
         <finNFSe>{dados.finNFSe}</finNFSe>
         <indFinal>{dados.indFinal}</indFinal>
         <cIndOp>{dados.cIndOp}</cIndOp>
-        <indDest>{dados .indDest}</indDest>
+        <indDest>{dados.indDest}</indDest>
         <valores>
             <trib>
                 <gIBSCBS>
-                    <cClassTrib>{dados.cClassTrib}</cClassTrib>
+                    <cClassTrib>{cClassTrib}</cClassTrib>
                 </gIBSCBS>
             </trib>
         </valores>
@@ -216,7 +227,7 @@ namespace NFSe.Class
                 string im = rps.sIMPrestador.PadLeft(12, '0');
                 string serie = rps.sSerie.PadRight(5, ' ');
                 string num = rps.nNumero.PadLeft(12, '0');
-                string data = DateTime.Now.ToString("yyyyMMdd");
+                string data = rps.DataEmissao.ToString("yyyyMMdd");
                 string iss = rps.iISSRetido == "1" ? "S" : "N";
                 string vServ = ((long)Math.Round(rps.ValorInicialCobrado * 100)).ToString().PadLeft(15, '0');
                 //string vDed = ((long)Math.Round(rps.nVlDeducoes * 100)).ToString().PadLeft(15, '0');
@@ -266,7 +277,7 @@ namespace NFSe.Class
                 request.Headers.TryAddWithoutValidation("SOAPAction", $"{NAMESPACE_SP}/ws/{actionName}");
                 var response = await client.SendAsync(request);
                 return await response.Content.ReadAsStringAsync();
-            }                       
+            }
 
             static void SalvarLog(string baseDir, string subFolder, string id, string content)
             {
@@ -292,7 +303,47 @@ namespace NFSe.Class
                     foreach (DataRow item in dps.Rows)
                     {
                         var dados1 = banco.ConvertToDadosSP(item);
+                        bool isCnpj = Regex.Replace(dados1.sCNPJCPFTomador ?? "", @"\D", "").Length > 11;
+                        decimal pis;
+                        decimal cofins;
+                        decimal nVlCsll;
+                        string Natureza_Retencao_Fonte = "";
 
+                        if (dados1.Zerar_Impostos.ToString() == "True")
+                        {
+                            pis = 0;
+                            cofins = 0;
+                        }
+                       
+                        if (isCnpj && dados1.Natureza_Retencao_Fonte.Trim(' ') != "" && dados1.ValorInicialCobrado >= 216)
+                        {
+                            pis = dados1.nVlPis_RET;
+                            cofins =  dados1.nVlCofins_RET;
+
+                            Natureza_Retencao_Fonte = dados1.Natureza_Retencao_Fonte.TrimStart('0');
+
+                            if (pis == 0 && cofins == 0)
+                            {
+                                Natureza_Retencao_Fonte = "0";
+                            }
+                        }                        
+                        else
+                        {
+                            pis = dados1.nVlPis;
+                            cofins = dados1.nVlCofins;
+                            Natureza_Retencao_Fonte = "0";
+                        }
+
+                        nVlCsll = dados1.nVlCsll;
+                        //if (isCnpj && dados1.Natureza_Retencao_Fonte != "" && dados1.nVlPis_RET > 0)
+                        //{
+                        //    nVlCsll = (dados1.nVlCsll + dados1.nVlPis_RET + dados1.nVlCofins_RET);
+                        //}
+                        //else {
+                        //    nVlCsll = dados1.nVlCsll;
+                        //}
+
+                        
                         var dados = new RpsData
                         {
                             iID_Emitente = dados1.iID_Emitente,
@@ -324,10 +375,10 @@ namespace NFSe.Class
                             nBaseCalculo = dados1.nBaseCalculo,
                             iISSRetido = dados1.iISSRetido,
                             nVlIR = dados1.nVlIR,
-                            nVlPis = dados1.nVlPis,
-                            nVlCofins = dados1.nVlCofins,
+                            nVlPis = pis,
+                            nVlCofins = cofins,
                             nVlDeducoes = dados1.nVlDeducoes,
-                            nVlCsll = dados1.nVlCsll,
+                            nVlCsll = nVlCsll,
 
                             // Faltou
                             sTributacaoRPS = dados1.sTributacaoRPS,
@@ -336,7 +387,17 @@ namespace NFSe.Class
                             indFinal = dados1.indFinal,
                             cIndOp = dados1.cIndOp,
                             indDest = dados1.indDest,
-                            cClassTrib = dados1.cClassTrib
+                            cClassTrib = dados1.cClassTrib,
+                            Natureza_Retencao_Fonte = Natureza_Retencao_Fonte,
+                            DataEmissao = dados1.DataEmissao,
+
+                            // IBS/CBS
+                            COD_NBS = dados1.COD_NBS,
+                            CST_IBS_CBS = dados1.CST_IBS_CBS,
+                            CLASSIF_TRIBUTARIA_IBS_CBS = dados1.CLASSIF_TRIBUTARIA_IBS_CBS,
+                            REDUCAO_PERCENT_IBS_CBS = dados1.REDUCAO_PERCENT_IBS_CBS,
+                            ALIQUOTA_IBS = dados1.ALIQUOTA_IBS,
+                            ALIQUOTA_CBS = dados1.ALIQUOTA_CBS
                         };
 
                         X509Certificate2 certificado = CarregarCertificado(dados1.iID_Emitente);
